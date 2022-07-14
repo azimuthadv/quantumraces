@@ -1,10 +1,12 @@
 import numpy as np
+import nashpy as nash
+import matplotlib.pyplot as plt
 
 # ===== CONSTANTS =====
 N = float(2**256) # number of possible hashes
-M = float(2**256 / 1e2) #number of solutions
+M = float(2**256 / 1e30) #number of solutions
 #K = int(np.ceil(np.pi / 4 * np.sqrt(N) - 3/2)) # number of strategies (number of times to measure)
-K = 2
+K = 3
 GIPS = 224 # number of grover iterations per second that the quantum computers are capable of
 num_plays = 2 # number of times each player can run Grover's algorithm
 # =====================
@@ -42,14 +44,15 @@ def alice_payoff():
     #dimension of the payoff matrix
     dim = int(len(set_K)**num_plays)
     #initialize the payoff matrices. There will be a separate one for each play. A[0] will be the total
-    A = [np.empty((dim, dim), dtype=float) for i in range(num_plays + 1)]
-
+    A = [np.zeros((dim, dim), dtype=float) for i in range(num_plays + 1)]
+    
     #populate each array
     for play in range(1, num_plays + 1):
         for col in range(dim):
             for row in range(dim):
-                A[play][col][row] = get_element(S, col, row, play, dim)
-                A[0][col][row] += A[play][col][row]
+                element = get_element(S, col, row, play, dim)
+                A[play][col][row] = element
+                A[0][col][row] = A[0][col][row] + A[play][col][row]
 
     return A[0]
 
