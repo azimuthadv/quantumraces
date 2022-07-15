@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 N = float(2**256) # number of possible hashes
 M = float(2**256 / 1e30) #number of solutions
 #K = int(np.ceil(np.pi / 4 * np.sqrt(N) - 3/2)) # number of strategies (number of times to measure)
-K = 3
+K = 10
 GIPS = 224 # number of grover iterations per second that the quantum computers are capable of
 num_plays = 2 # number of times each player can run Grover's algorithm
 # =====================
@@ -103,4 +103,10 @@ def p_func(p, arr):
 
     return prod
 
-print(alice_payoff())
+A = alice_payoff()
+B = A.T
+
+race = nash.Game(A, B)
+eqs = race.support_enumeration()
+for eq in eqs:
+    print(eq)
