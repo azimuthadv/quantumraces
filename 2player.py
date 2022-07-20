@@ -6,9 +6,10 @@ import matplotlib.pyplot as plt
 N = float(2**256) # number of possible hashes
 M = float(2**256 / 1e30) #number of solutions
 #K = int(np.ceil(np.pi / 4 * np.sqrt(N) - 3/2)) # number of strategies (number of times to measure)
-K = 10
+K = 3
 GIPS = 224 # number of grover iterations per second that the quantum computers are capable of
 num_plays = 2 # number of times each player can run Grover's algorithm
+mat_dim = K**num_plays #dimension of payoff matrix
 # =====================
 
 #Calculates the probability of Grover's algorithm finding the marked item after time t.
@@ -60,8 +61,8 @@ def alice_payoff():
 def get_element(S, col, row, play, dim):
     cart = S[col * dim + row]
     strat_length = len(cart) // 2
-    alice_strat = cart[strat_length:]
-    bob_strat = cart[:strat_length]
+    alice_strat = cart[:strat_length]
+    bob_strat = cart[strat_length:]
     #print('Alice Strat: {}, Bob Strat: {}'.format(alice_strat, bob_strat))
     assert play <= strat_length, 'Only {} plays are allowed in this game, got {}'.format(strat_length, play)
     
@@ -103,10 +104,45 @@ def p_func(p, arr):
 
     return prod
 
+'''
 A = alice_payoff()
 B = A.T
+print(A)
 
 race = nash.Game(A, B)
 eqs = race.support_enumeration()
 for eq in eqs:
     print(eq)
+'''
+
+# get the elements of the payoff matrix from col and row, without constructing everything
+def get_cartesian_element(col, row):
+    set_K = np.arange(1, K + 1)
+    cart_prod = cartesian((set_K, set_K))
+    return np.append(cart_prod[col], cart_prod[row])
+
+def get_alice_payoff_element(col, row):
+    cart = get_cartesian_element(col, row)
+    strat_length = len(cart) // 2
+    alice_strat = cart[:strat_length]
+    bob_strat = cart[strat_length:]
+
+    elem = 0
+    for play in range(1, num_plays + 1):
+        prefactor = p_i(alice_strat[play-1])
+        if play > 1:
+            c = play - 2
+            while c >= 0:
+                prefactor *= (1 - p_i(alice_strat[c]))
+                c -= 1
+
+        elem += prefactor * interval(alice_strat, bob_strat, p_i, play)
+    return elem
+
+def get_row(row):
+    return [get_alice_payoff_element(x, row) for x in range(mat_dim)]
+
+def get_col(col):
+    return [get_alice_payoff_element(col, x) for x in range(mat_dim)]
+
+print(get_row(2))
