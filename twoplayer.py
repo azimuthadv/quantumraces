@@ -1,20 +1,21 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import nashpy as nash
 
 # ===== CONSTANTS =====
 N = float(2**256) # number of possible hashes
-M = float(2**256 / 1e30) #number of solutions
+M = float(2**256 / 1e20) #number of solutions
 #K = int(np.ceil(np.pi / 4 * np.sqrt(N) - 3/2)) # number of strategies (number of times to measure)
 GIPS = 224 # number of grover iterations per second that the quantum computers are capable of
-num_plays = 3 # number of times each player can run Grover's algorithm
-K = 120
+num_plays = 2 # number of times each player can run Grover's algorithm
+K = 30
 mat_dim = K**num_plays #dimension of payoff matrix
 # =====================
 
 #Calculates the probability of Grover's algorithm finding the marked item after time t.
 def p_i(t):
     theta = float(np.arcsin(1 / (np.sqrt(N / M))))
-    return (np.sin(2*((t * 5 * GIPS) + 0.5) * theta))**2
+    return (np.sin(2*((t * 10 * GIPS) + 0.5) * theta))**2
 
 #function to get create a matrix of the Cartesian products of inputted arrays
 def cartesian(arrays, out = None):
@@ -106,16 +107,6 @@ def p_func(p, arr):
 
     return prod
 
-'''
-A = alice_payoff()
-B = A.T
-print(A)
-
-race = nash.Game(A, B)
-eqs = race.support_enumeration()
-for eq in eqs:
-    print(eq)
-'''
 
 # get the elements of the payoff matrix from col and row, without constructing everything
 def get_cartesian_element(col, row):
@@ -151,5 +142,20 @@ def get_row(row):
 def get_col(col):
     return [get_alice_payoff_element(col, x) for x in range(mat_dim)]
 
+def print_results(res, player):
+    for i, value in enumerate(res):
+        if abs(value) != 0:
+            print('Player {} plays strategy {} with probability {}'.format(player, [10 * x for x in get_cartesian_element(i % mat_dim, i // mat_dim)], value))
+            #print('Player {} plays strategy {} with probability {}'.format(player, i, value))
 
-print(get_row(2))
+A = alice_payoff()
+B = A.T
+
+game = nash.Game(A, B)
+print('made game')
+c = 0
+for eq in game.vertex_enumeration():
+    print('NASH EQ {}'.format(c))
+    print_results(np.round(eq[0], 2), 'Alice')
+    print_results(np.round(eq[1], 2), 'Bob')
+    c += 1
