@@ -1,21 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import nashpy as nash
+import sys
 
 # ===== CONSTANTS =====
 N = float(2**256) # number of possible hashes
-M = float(2**256 / 1e20) #number of solutions
+M = float(2**256 / 1e10) #number of solutions
 #K = int(np.ceil(np.pi / 4 * np.sqrt(N) - 3/2)) # number of strategies (number of times to measure)
 GIPS = 224 # number of grover iterations per second that the quantum computers are capable of
 num_plays = 2 # number of times each player can run Grover's algorithm
-K = 30
+intvl = 20
+K = 600 // intvl
 mat_dim = K**num_plays #dimension of payoff matrix
+
+original_stdout = sys.stdout
 # =====================
 
 #Calculates the probability of Grover's algorithm finding the marked item after time t.
 def p_i(t):
     theta = float(np.arcsin(1 / (np.sqrt(N / M))))
-    return (np.sin(2*((t * 10 * GIPS) + 0.5) * theta))**2
+    return (np.sin(2*((t * intvl * GIPS) + 0.5) * theta))**2
 
 #function to get create a matrix of the Cartesian products of inputted arrays
 def cartesian(arrays, out = None):
@@ -85,10 +89,7 @@ def get_element(S, col, row, play, dim):
 # (1 - p_i(b0))(1-p_i(b1)) if a0 >= b0 + b1
 def interval(arr1, arr2, p, play):  
     x = sum(arr1[:play])
-
-    if x > K:
-        return 0
-    elif x < arr2[0]:
+    if x < arr2[0]:
         return p_func(p, [])
 
     for i in range(len(arr2) - 1):
@@ -129,8 +130,7 @@ def get_alice_payoff_element(col, row):
             c = play - 2
             while c >= 0:
                 prefactor *= (1 - p_i(alice_strat[c]))
-                c -= 1#print('Alice Strat: {}, Bob Strat: {}'.format(alice_strat, bob_strat))
-
+                c -= 1
 
         elem += prefactor * interval(alice_strat, bob_strat, p_i, play)
 
@@ -144,18 +144,31 @@ def get_col(col):
 
 def print_results(res, player):
     for i, value in enumerate(res):
-        if abs(value) != 0:
-            print('Player {} plays strategy {} with probability {}'.format(player, [10 * x for x in get_cartesian_element(i % mat_dim, i // mat_dim)], value))
-            #print('Player {} plays strategy {} with probability {}'.format(player, i, value))
+        if abs(value) != 0.0:
+            strat = [intvl * x for x in get_cartesian_element(i % mat_dim, i // mat_dim)]
+            strat_length = len(strat) // 2
+            if player == 'Alice': 
+                print('Player {} plays strategy {} with probability {}'.format(player, strat[:strat_length], value))
+            else:
+                print('Player {} plays strategy {} with probability {}'.format(player, strat[strat_length:], value))
 
 A = alice_payoff()
+
+print(A)
+
 B = A.T
 
-game = nash.Game(A, B)
+game = nash.Game(A)
 print('made game')
 c = 0
-for eq in game.vertex_enumeration():
-    print('NASH EQ {}'.format(c))
-    print_results(np.round(eq[0], 2), 'Alice')
-    print_results(np.round(eq[1], 2), 'Bob')
-    c += 1
+with open('output.txt' , 'w') as f:
+    sys.stdout = f
+    for eq in game.vertex_enumeration():
+        sys.stdout = original_stdout
+        print('NASH EQ {}'.format(c))
+        sys.stdout = f
+        print('NASH EQ {}'.format(c))
+        print_results(np.round(eq[0], 2), 'Alice')
+        print_results(np.round(eq[1], 2), 'Bob')
+        c += 1
+    sys.stdout = original_stdout
