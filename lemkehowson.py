@@ -1,7 +1,8 @@
-# lexicographic pivoting degenerate games from https://github.com/shizejin/theory16HW
 
 import numpy as np
+import random
 
+# lexicographic ratio test from https://github.com/shizejin/theory16HW
 def approx_equal(x, y, epsilon):
     if y-epsilon < x < y+epsilon:
         return True
@@ -24,21 +25,43 @@ def min_set(v):
     
     return idx
 
-def lexico_ratio(tableau, pivot, Crange):  
+
+def lexico_ratio(tableau, pivot, Crange): 
+    #get the pivot column of the tableau. Create a new list that stores whether or not the elements of that column are <= 0.
     ind_nonpositive = tableau[:, pivot] <= 0
-    #print('ind_nonpositive: {}'.format(ind_nonpositive))
+    #get the columns of the basic variables and store them into C
     C = tableau[:, Crange]
-    with np.errstate(divide='ignore'):
+    with np.errstate(divide='ignore'): #ignore divide by 0
+        #divide the last column by the pivot column, store into C0
         C0 = tableau[:, -1] / tableau[:, pivot]
+        #if one of the pivot column elements were non positive, set that same element in C0 to inf
         C0[ind_nonpositive] = np.inf
+        #find the minimum element index of C0. Since each element cooresponds to a row, we find the minimum row for this column.
         row_min = min_set(C0)
+    #if there is only one minimum row, return it. 
     if len(row_min) == 1:
-        return row_min[0] 
+        return row_min[0]
+
+    #solve tie by choosing a random element arbitrarily. 
+    #return random.choice(row_min)
+
     
+    #If there are multiple minimum rows, start looping through the total number of labels present in the other tableau
+    #tie breaking rule
+    #loop through the min rows that are at a tie, compare each element from left to right, pick smallest
+    #think of this as ordering alphabetically, when both words start with same letter. 
     for i in range(C.shape[1]):
-        Ci = (C[:, i] / tableau[:, pivot])[row_min]
-        #print('Ci {}'.format(Ci))
-        Ci[ind_nonpositive] = np.inf
+        with np.errstate(divide = 'ignore'):
+            #Ci is the ith column of C, divided by the pivot column of tableau, at row min indices
+            Ci = (C[:, i] / tableau[:, pivot])[row_min]
+        #if one of the pivot column elements were non positive, set that same element in C0 to inf
+        
+        for i in range(len(Ci)):
+            elem = ind_nonpositive[i]
+            if elem:
+                Ci[i] = np.inf
+       
+        
         row_min = min_set(Ci)
         if len(row_min) == 1:
             return row_min[0]
@@ -48,9 +71,12 @@ def lexico_ratio(tableau, pivot, Crange):
 def pivoting(tableau, basic_vars, pivot, Crange):
     
     row_min = lexico_ratio(tableau, pivot, Crange)
-    tableau[row_min, :] /= tableau[row_min, pivot]
+    with np.errstate(divide = 'ignore'):
+        tableau[row_min, :] /= tableau[row_min, pivot]
     for i in range(tableau.shape[0]):
         if i != row_min:
+            if row_min is None:
+                print("NO ROW MIN")
             tableau[i, :] -= tableau[i, pivot] * tableau[row_min, :]
     basic_vars[row_min], pivot = pivot, basic_vars[row_min]
     return pivot
