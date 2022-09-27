@@ -2,16 +2,18 @@ import numpy as np
 import lemkehowson as lh
 import sys
 import random
+from decimal import *
 
 # ===== CONSTANTS =====
 N = float(2**256) # number of possible hashes
-M = float(2**256 / 1e30) #number of solutions
+M = float(2**256 / 1e10) #number of solutions
 D = float(1e10)
 #K = int(np.ceil(np.pi / 4 * np.sqrt(N) - 3/2)) # number of strategies (number of times to measure)
 GIPS = 224 # number of grover iterations per second that the quantum computers are capable of
 num_plays = 2 # number of times each player can run Grover's algorithm
 intvl = 15
 K = 600 // intvl
+gamma = Decimal(0.6)
 mat_dim = K**num_plays #dimension of payoff matrix
 
 # =====================
@@ -21,7 +23,7 @@ original_stdout = sys.stdout
 #Calculates the probability of Grover's algorithm finding the marked item after time t.
 def p_i(t):
     theta = float(np.arcsin(1 / (np.sqrt(D))))
-    return (np.sin(2*((t * intvl * GIPS) + 0.5) * theta))**2
+    return Decimal((np.sin(2*((t * intvl * GIPS) + 0.5) * theta))**2)
 
 #function to get create a matrix of the Cartesian products of inputted arrays
 def cartesian(arrays, out = None):
@@ -42,7 +44,7 @@ def cartesian(arrays, out = None):
 
     return out
 
-def alice_payoff():
+def get_payoff(bob = False):
     # first get all of the permutations from the cartesian product to index the matrix
     set_K = np.arange(1, K + 1)
     arrs = (set_K for i in range(2*num_plays))
@@ -57,14 +59,14 @@ def alice_payoff():
     for play in range(1, num_plays + 1):
         for col in range(dim):
             for row in range(dim):
-                element = get_element(S, col, row, play, dim)
+                element = get_element(S, col, row, play, dim, bob)
                 A[play][col][row] = element
                 A[0][col][row] = A[0][col][row] + A[play][col][row]
 
     return A[0]
 
 
-def get_element(S, col, row, play, dim):
+def get_element(S, col, row, play, dim, bob = False):
     cart = S[col * dim + row]
     strat_length = len(cart) // 2
     alice_strat = cart[:strat_length]
@@ -73,15 +75,25 @@ def get_element(S, col, row, play, dim):
     assert play <= strat_length, 'Only {} plays are allowed in this game, got {}'.format(strat_length, play)
     
     #first calculate the prefactor for the matrix
-    prefactor = p_i(alice_strat[play-1])
-    if play > 1:
-        c = play - 2
-        while c >= 0:
-            prefactor *= (1 - p_i(alice_strat[c]))
-            c -= 1
+
+    if not bob:
+        prefactor = p_i(alice_strat[play-1])
+        if play > 1:
+            c = play - 2
+            while c >= 0:
+                prefactor *= (1 - p_i(alice_strat[c]))
+                c -= 1
+    else:
+        prefactor = p_i(bob_strat[play-1])
+        if play > 1:
+            c = play - 2
+            while c >= 0:
+                prefactor *= (1 - p_i(bob_strat[c]))
+                c -= 1
         
     #return this prefactor multiplied by the element case
-    return prefactor * interval(alice_strat, bob_strat, p_i, play)
+    return prefactor * interval(alice_strat, bob_strat, p_i, play, bob)
+
 
 
 #gets the correct interval based on the strategies. The payoff matrix is split into intervals. 
@@ -89,18 +101,32 @@ def get_element(S, col, row, play, dim):
 # 1 if a0 < b0
 # (1 - p_i(b0)) if b0 <= a0 < b0 + b1
 # (1 - p_i(b0))(1-p_i(b1)) if a0 >= b0 + b1
-def interval(arr1, arr2, p, play):  
-    x = sum(arr1[:play])
-    if x > K:
-        return 0
-    elif x < arr2[0]:
-        return p_func(p, [])
+def interval(arr1, arr2, p, play, bob = False):
+    if not bob:  
+        x = sum(arr1[:play])
+        if x > K:
+            return 0
+        elif x < arr2[0]:
+            return p_func(p, []) + gamma * (p_i(x)**2)
 
-    for i in range(len(arr2) - 1):
-        if sum(arr2[:i+1]) <= x < sum(arr2[:i+2]):
-            return p_func(p, arr2[0:i+1])
+        for i in range(len(arr2) - 1):
+            if sum(arr2[:i+1]) <= x < sum(arr2[:i+2]):
+                return p_func(p, arr2[0:i+1]) + gamma * (p_i(sum(arr2[:i+1])))**2
 
-    return p_func(p, arr2)
+        return p_func(p, arr2) + gamma * (p_i(sum(arr2)))**2
+    else:
+        x = sum(arr2[:play])
+        if x > K:
+            return 0
+        elif x < arr1[0]:
+            return p_func(p, []) + (1 - gamma) * (p_i(x)**2)
+
+        for i in range(len(arr1) - 1):
+            if sum(arr1[:i+1]) <= x < sum(arr1[:i+2]):
+                return p_func(p, arr1[0:i+1]) + (1 - gamma) * (p_i(sum(arr1[:i+1])))**2
+
+        return p_func(p, arr1) + (1 - gamma) * (p_i(sum(arr1)))**2
+
 
 
 #returns the correct element based on the interval function above
@@ -155,10 +181,10 @@ def print_results(res, player):
             print('{} plays strategy {} with probability {}'.format(player, strat, value))
 
 
-A = alice_payoff()
-B = A.T
+A = get_payoff()
+B = get_payoff(bob = True)
 
-# for testing purpos
+# for testing purposes
 num_eq = 10
 
 print('made game')
@@ -172,3 +198,6 @@ with open('output.txt' , 'w') as f:
         print('EQUILIBRIUM {}'.format(i))
         print_results(np.round(eq[0], 10), 'Alice')
         print_results(np.round(eq[1], 10), 'Bob')
+
+sys.stdout = original_stdout
+print('done')
