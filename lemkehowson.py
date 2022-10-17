@@ -1,4 +1,3 @@
-
 import numpy as np
 import random
 
@@ -127,5 +126,3 @@ def Lemke_Howson(tableaus, basic_vars_list, Crange, init_pivot, return_tableau =
         return actions, tableaus, basic_vars_list
     
     return actions
-
-

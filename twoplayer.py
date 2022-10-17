@@ -1,7 +1,6 @@
 import numpy as np
 import lemkehowson as lh
 import sys
-import random
 from decimal import *
 
 # ===== CONSTANTS =====
@@ -178,26 +177,28 @@ def print_results(res, player):
             set_K = np.arange(1, K + 1)
             cart_prod = cartesian((set_K for x in range(num_plays)))
             strat = [intvl * x for x in cart_prod[i]]
-            print('{} plays strategy {} with probability {}'.format(player, strat, value))
+            print('{} {} {}'.format(player, strat, value))
 
 
-A = get_payoff()
-B = get_payoff(bob = True)
 
-# for testing purposes
-num_eq = 10
+def get_eq():
+    A = get_payoff()
+    B = get_payoff(bob = True)
+    with open('output.txt' , 'w') as f:
+        tableaus, basic_vars = lh.create_tableau(A, B)
+        Crange = basic_vars
+        sys.stdout = f
 
-print('made game')
-with open('output.txt' , 'w') as f:
-    tableaus, basic_vars = lh.create_tableau(A, B)
-    Crange = basic_vars
-    sys.stdout = f
+        for i in range(mat_dim):
+            eq = lh.Lemke_Howson(tableaus, basic_vars, Crange, init_pivot = i)
+            print_results(np.round(eq[0], 10), 'Alice')
+            print_results(np.round(eq[1], 10), 'Bob')
+            print('-----')
 
-    for i in range(num_eq):
-        eq = lh.Lemke_Howson(tableaus, basic_vars, Crange, init_pivot = random.randint(0, mat_dim))
-        print('EQUILIBRIUM {}'.format(i))
-        print_results(np.round(eq[0], 10), 'Alice')
-        print_results(np.round(eq[1], 10), 'Bob')
+    return 
 
-sys.stdout = original_stdout
-print('done')
+def main():
+    get_eq()
+
+if __name__ == "__main__":
+    main()
