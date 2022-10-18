@@ -1,12 +1,13 @@
 from random import randrange, choices, uniform
 import twoplayer as tp
 from itertools import chain
+import numpy as np
 
 D = tp.D
 
 
 fname = 'output.txt'
-num_simulations = 100
+num_simulations = 1000000
 
 def read_from_file(fname):
     c = 0
@@ -38,33 +39,57 @@ def read_from_file(fname):
 
 def simulate_strats(fname):
     strats = read_from_file(fname)
+    num_forks = 0
+    num_blocks = 0
     for sim in range(num_simulations):
         idx = randrange(len(strats))
         strat_to_play = strats[idx]
         alice_strat = list(chain(*choices(strat_to_play[0], weights = strat_to_play[2])))
         bob_strat = list(chain(*choices(strat_to_play[1], weights = strat_to_play[3])))
         strat_length = len(alice_strat)
-        num_forks = 0
-        tat, tbt = 0, 0
+        tat, tbt = [], []
 
-        for i in strat_length:
+        for i in range(strat_length):
             a = alice_strat[i]
             b = bob_strat[i]
             r = uniform(0, 1)
-            tat = tat + a #keep track of the total amount of time alice and bob are measuring
-            tbt = tbt + b
-            if tat < tbt: #alice is measuring first
-                if r < tp.p_i(a): #alice wins
+            tat.append(sum(alice_strat[:i+1])) #keep track of the total amount of time alice and bob are measuring
+            tbt.append(sum(bob_strat[:i+1]))
+
+
+            if tat[i] < tbt[i]: #alice is measuring first
+                if r <= tp.p_i(a): #alice has a successful measurement
+                    num_blocks = num_blocks + 1
                     r = uniform(0, 1)
-                    if r < tp.p_i(a):
+                    if i == 0:
+                        if r <= tp.p_i(a): #bob measures at alice's time
+                            num_forks = num_forks + 1
+                    else:
+                        if r <= tp.p_i(np.abs(tat[i] - tbt[i-1])):
+                            num_forks = num_forks + 1
+            elif tat[i] > tbt[i]: #bob is measuring first
+                if r <= tp.p_i(b): #bob's measurement is successful
+                    num_blocks = num_blocks + 1
+                    r = uniform(0, 1)
+        num_forks = 0
+                    if i == 0:
+                        if r <= tp.p_i(b): #alice measures at bob's time
+                           num_forks = num_forks + 1
+                    else:
+                        if r <= tp.p_i(np.abs(tbt[i] - tat[i-1])):
+                            num_forks = num_forks + 1
+            else: #alice and bob measure at the same time
+                if r <= tp.p_i(a):
+                    r = uniform(0, 1)
+                    if r <= tp.p_i(b):
                         num_forks = num_forks + 1
-            else: #bob is measuring first
-                continue
 
-    return
 
+    return num_forks / num_blocks
 
 
 
 
-simulate_strats(fname)
+
+forks = simulate_strats(fname)
+print(forks)
