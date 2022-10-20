@@ -56,7 +56,6 @@ def simulate_strats(fname):
             tat.append(sum(alice_strat[:i+1])) #keep track of the total amount of time alice and bob are measuring
             tbt.append(sum(bob_strat[:i+1]))
 
-
             if tat[i] < tbt[i]: #alice is measuring first
                 if r <= tp.p_i(a): #alice has a successful measurement
                     num_blocks = num_blocks + 1
@@ -67,23 +66,37 @@ def simulate_strats(fname):
                     else:
                         if r <= tp.p_i(np.abs(tat[i] - tbt[i-1])):
                             num_forks = num_forks + 1
+                else: #alice does not have a succesful measurement
+                    if r <= tp.p_i(b):
+                        num_blocks = num_blocks + 1
+                        r = uniform(0, 1)
+                        if i != strat_length:
+                            if r <= tp.p_i(np.abs(tbt[i] - tat[i])):
+                                num_forks = num_forks + 1
+
             elif tat[i] > tbt[i]: #bob is measuring first
-                if r <= tp.p_i(b): #bob's measurement is successful
+                if r <= tp.p_i(b): #bob has a successful measurement
                     num_blocks = num_blocks + 1
                     r = uniform(0, 1)
-        num_forks = 0
                     if i == 0:
-                        if r <= tp.p_i(b): #alice measures at bob's time
-                           num_forks = num_forks + 1
+                        if r <= tp.p_i(b):
+                            num_forks = num_forks + 1
                     else:
                         if r <= tp.p_i(np.abs(tbt[i] - tat[i-1])):
                             num_forks = num_forks + 1
-            else: #alice and bob measure at the same time
+                else: #bob's measurement fails
+                    if r <= tp.p_i(a):
+                        num_blocks = num_blocks + 1
+                        r = uniform(0, 1)
+                        if i != strat_length:
+                            if r <= tp.p_i(np.abs(tat[i] - tbt[i])):
+                                num_forks = num_forks + 1
+            else: #alice and bob are measuring at the same time
                 if r <= tp.p_i(a):
                     r = uniform(0, 1)
                     if r <= tp.p_i(b):
                         num_forks = num_forks + 1
-
+                    
 
     return num_forks / num_blocks
 
