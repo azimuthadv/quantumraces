@@ -5,15 +5,16 @@ from decimal import *
 
 # ===== CONSTANTS =====
 N = float(2**256) # number of possible hashes
-M = float(2**256 / 1e10) #number of solutions
-D = float(1e10)
-#K = int(np.ceil(np.pi / 4 * np.sqrt(N) - 3/2)) # number of strategies (number of times to measure)
-GIPS = 224 # number of grover iterations per second that the quantum computers are capable of
+D = float(1e20) #network difficulty
 num_plays = 2 # number of times each player can run Grover's algorithm
-intvl = 15
-K = 600 // intvl
-gamma = Decimal(0.6)
+
+K = 45 #number of strategies
+max_K = 20148780 #maximum possible number of iterations per round
+intvl = max_K // K #shorten the strategy space by checking intervals
+gamma = Decimal(0.70) # the probability that alice wins in a fork
 mat_dim = K**num_plays #dimension of payoff matrix
+
+getcontext().prec = 50
 
 # =====================
 
@@ -22,7 +23,7 @@ original_stdout = sys.stdout
 #Calculates the probability of Grover's algorithm finding the marked item after time t.
 def p_i(t):
     theta = float(np.arcsin(1 / (np.sqrt(D))))
-    return Decimal((np.sin(2*((t * intvl * GIPS) + 0.5) * theta))**2)
+    return Decimal((np.sin(2*((t * intvl) + 0.5) * theta))**2)
 
 #function to get create a matrix of the Cartesian products of inputted arrays
 def cartesian(arrays, out = None):
@@ -46,13 +47,13 @@ def cartesian(arrays, out = None):
 def get_payoff(bob = False):
     # first get all of the permutations from the cartesian product to index the matrix
     set_K = np.arange(1, K + 1)
-    arrs = (set_K for i in range(2*num_plays))
+    arrs = (set_K for i in range(num_plays))
     S = cartesian(arrs)
 
     #dimension of the payoff matrix
     dim = int(len(set_K)**num_plays)
     #initialize the payoff matrices. There will be a separate one for each play. A[0] will be the total
-    A = [np.zeros((dim, dim), dtype=float) for i in range(num_plays + 1)]
+    A = [np.zeros((dim, dim), dtype=Decimal) for i in range(num_plays + 1)]
     
     #populate each array
     for play in range(1, num_plays + 1):
@@ -66,7 +67,8 @@ def get_payoff(bob = False):
 
 
 def get_element(S, col, row, play, dim, bob = False):
-    cart = S[col * dim + row]
+    row_strats, col_strats = S, S
+    cart = [*row_strats[col], *col_strats[row]]
     strat_length = len(cart) // 2
     alice_strat = cart[:strat_length]
     bob_strat = cart[strat_length:]
@@ -80,7 +82,7 @@ def get_element(S, col, row, play, dim, bob = False):
         if play > 1:
             c = play - 2
             while c >= 0:
-                prefactor *= (1 - p_i(alice_strat[c]))
+                prefactor *= Decimal((1 - p_i(alice_strat[c])))
                 c -= 1
     else:
         prefactor = p_i(bob_strat[play-1])
@@ -89,9 +91,11 @@ def get_element(S, col, row, play, dim, bob = False):
             while c >= 0:
                 prefactor *= (1 - p_i(bob_strat[c]))
                 c -= 1
+
+    element = Decimal(prefactor * interval(alice_strat, bob_strat, p_i, play, prefactor, bob))
         
     #return this prefactor multiplied by the element case
-    return prefactor * interval(alice_strat, bob_strat, p_i, play, bob)
+    return element
 
 
 
@@ -100,32 +104,35 @@ def get_element(S, col, row, play, dim, bob = False):
 # 1 if a0 < b0
 # (1 - p_i(b0)) if b0 <= a0 < b0 + b1
 # (1 - p_i(b0))(1-p_i(b1)) if a0 >= b0 + b1
-def interval(arr1, arr2, p, play, bob = False):
+def interval(arr1, arr2, p, play, prefactor, bob = False):
     if not bob:  
         x = sum(arr1[:play])
         if x > K:
             return 0
         elif x < arr2[0]:
-            return p_func(p, []) + gamma * (p_i(x)**2)
+            return p_func(p, []) + gamma/prefactor * (p_i(arr1[play-1])**2)
 
         for i in range(len(arr2) - 1):
-            if sum(arr2[:i+1]) <= x < sum(arr2[:i+2]):
-                return p_func(p, arr2[0:i+1]) + gamma * (p_i(sum(arr2[:i+1])))**2
+            if sum(arr2[:i+1]) < x < sum(arr2[:i+2]):
+                return p_func(p, arr2[0:i+1]) + gamma/prefactor *  (p_i(x - arr2[i+1]))**2
+            elif x == sum(arr2[:i+1]):
+                return p_func(p, arr2[0:i+2]) + gamma/prefactor * p_i(arr1[play-1]) * p_i(arr2[i])
 
-        return p_func(p, arr2) + gamma * (p_i(sum(arr2)))**2
+        return p_func(p, arr2) 
     else:
         x = sum(arr2[:play])
         if x > K:
             return 0
         elif x < arr1[0]:
-            return p_func(p, []) + (1 - gamma) * (p_i(x)**2)
+            return p_func(p, []) + (1 - gamma/prefactor) * (p_i(arr2[play-1])**2)
 
         for i in range(len(arr1) - 1):
-            if sum(arr1[:i+1]) <= x < sum(arr1[:i+2]):
-                return p_func(p, arr1[0:i+1]) + (1 - gamma) * (p_i(sum(arr1[:i+1])))**2
+            if sum(arr1[:i+1]) < x < sum(arr1[:i+2]):
+                return p_func(p, arr1[0:i+1]) + (1 - gamma)/prefactor *  (p_i(x - arr1[i+1]))**2
+            elif x == sum(arr1[:i+1]):
+                return p_func(p, arr1[0:i+2]) + (1 - gamma)/prefactor * p_i(arr2[play-1]) * p_i(arr1[i])
 
-        return p_func(p, arr1) + (1 - gamma) * (p_i(sum(arr1)))**2
-
+        return p_func(p, arr1) 
 
 
 #returns the correct element based on the interval function above
@@ -133,7 +140,7 @@ def p_func(p, arr):
     prod = 1
 
     for i in arr:
-        prod *= (1 - p(i))
+        prod *= Decimal((1 - p(i)))
 
     return prod
 
@@ -184,6 +191,7 @@ def print_results(res, player):
 def get_eq():
     A = get_payoff()
     B = get_payoff(bob = True)
+
     with open('output.txt' , 'w') as f:
         tableaus, basic_vars = lh.create_tableau(A, B)
         Crange = basic_vars

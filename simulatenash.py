@@ -7,7 +7,7 @@ D = tp.D
 
 
 fname = 'output.txt'
-num_simulations = 1000000
+num_simulations = 100000000
 
 def read_from_file(fname):
     c = 0

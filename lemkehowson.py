@@ -1,24 +1,31 @@
 import numpy as np
-import random
+from decimal import *
+getcontext().prec = 100
+
 
 # lexicographic ratio test from https://github.com/shizejin/theory16HW
 def approx_equal(x, y, epsilon):
-    if y-epsilon < x < y+epsilon:
+    if Decimal(y) -epsilon < Decimal(x) < Decimal(y) +epsilon:
         return True
     return False
+
 
 def min_set(v):
     
     idx = []
     small = np.inf
-    epsilon = 10e-15
+    epsilon = Decimal(10e-60)
+    #60 for D = 10e30
     
     for i in range(len(v)):
         if v[i] < 0:
+            #print('case one')
             continue
         if approx_equal(v[i], small, epsilon):
+            #print('case two')
             idx.append(i)
         elif v[i] < small:
+            #print('case three')
             small = v[i]
             idx = [i]
     
