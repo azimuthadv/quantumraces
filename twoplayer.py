@@ -3,16 +3,18 @@ import lemkehowson as lh
 import sys
 from decimal import *
 
+
 # ===== CONSTANTS =====
 N = float(2**256) # number of possible hashes
-D = float(1e20) #network difficulty
+D = float(1e60) #network difficulty
 num_plays = 2 # number of times each player can run Grover's algorithm
 
-K = 45 #number of strategies
-max_K = 20148780 #maximum possible number of iterations per round
+K = 30 #number of pure strategies
+#max_K = 20148780 #maximum possible number of iterations per round
+max_K = np.floor(np.pi / 4 * np.sqrt(10e30))
 intvl = max_K // K #shorten the strategy space by checking intervals
-gamma = Decimal(0.70) # the probability that alice wins in a fork
-mat_dim = K**num_plays #dimension of payoff matrix
+gamma = Decimal(0.60) # the probability that alice wins in a fork
+mat_dim = (K+1)**num_plays #dimension of payoff matrix
 
 getcontext().prec = 50
 
@@ -46,7 +48,7 @@ def cartesian(arrays, out = None):
 
 def get_payoff(bob = False):
     # first get all of the permutations from the cartesian product to index the matrix
-    set_K = np.arange(1, K + 1)
+    set_K = np.arange(0, K + 1)
     arrs = (set_K for i in range(num_plays))
     S = cartesian(arrs)
 

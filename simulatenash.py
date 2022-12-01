@@ -2,12 +2,13 @@ from random import randrange, choices, uniform
 import twoplayer as tp
 from itertools import chain
 import numpy as np
+import matplotlib.pyplot as plt
 
 D = tp.D
 
 
 fname = 'output.txt'
-num_simulations = 100000000
+num_simulations = 10000000
 
 def read_from_file(fname):
     c = 0
@@ -22,10 +23,10 @@ def read_from_file(fname):
             data = line.strip().split(' ')
             data = [x.strip('[,]') for x in data]
             if data[0] == 'Alice':
-                alice_strat.append([int(x) for x in data[1:-1]])
+                alice_strat.append([float(x) for x in data[1:-1]])
                 alice_prob.append(float(data[-1]))
             elif data[0] == 'Bob':
-                bob_strat.append([int(x) for x in data[1:-1]])
+                bob_strat.append([float(x) for x in data[1:-1]])
                 bob_prob.append(float(data[-1]))
             elif(data[0] == '-----' and f.readline().split(' ')[0] != '-----'):
                 strats[c] = [alice_strat, bob_strat, alice_prob, bob_prob]
@@ -98,11 +99,29 @@ def simulate_strats(fname):
                         num_forks = num_forks + 1
                     
 
-    return num_forks / num_blocks
+    if num_blocks == 0:
+        return 0
+    else:
+        return num_forks / num_blocks
 
 
+def plot_fork_rate():
+    Ds = [float(10**x) for x in range(30, 61, 5)]
+    fork_rate = []
+    for i in range(len(Ds)):
+        tp.D = Ds[i]
+        tp.get_eq()
+        fork_rate.append(simulate_strats(fname))
+
+    plt.figure()
+    plt.plot(Ds, fork_rate)
+    plt.xlabel('Difficulty')
+    plt.ylabel('Fork Rate')
+    plt.title('Forking Rate when Mining Optimally')
+    plt.grid(True)
+    plt.show()
+    plt.savefig('result.png')
 
 
-
-forks = simulate_strats(fname)
-print(forks)
+plot_fork_rate()
+#print(simulate_strats(fname))
