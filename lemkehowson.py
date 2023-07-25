@@ -3,7 +3,7 @@ from decimal import *
 getcontext().prec = 100
 
 
-# lexicographic ratio test from https://github.com/shizejin/theory16HW
+# lexicographic ratio test from https://github.com/shizejin/
 def approx_equal(x, y, epsilon):
     if Decimal(y) -epsilon < Decimal(x) < Decimal(y) +epsilon:
         return True
@@ -14,7 +14,7 @@ def min_set(v):
     
     idx = []
     small = np.inf
-    epsilon = Decimal(10e-60)
+    epsilon = Decimal(10e-15)
     #60 for D = 10e30
     
     for i in range(len(v)):
@@ -72,6 +72,7 @@ def lexico_ratio(tableau, pivot, Crange):
         if len(row_min) == 1:
             return row_min[0]
     
+    print(len(row_min))
     print("lexico minimum ratio is not found!")
 
 def pivoting(tableau, basic_vars, pivot, Crange):

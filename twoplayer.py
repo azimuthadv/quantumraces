@@ -6,23 +6,25 @@ from decimal import *
 
 # ===== CONSTANTS =====
 N = float(2**256) # number of possible hashes
-D = float(1e60) #network difficulty
+D = float(1e10) #network difficulty
 num_plays = 2 # number of times each player can run Grover's algorithm
 
-K = 30 #number of pure strategies
+K = 20 #number of pure strategies
 #max_K = 20148780 #maximum possible number of iterations per round
-max_K = np.floor(np.pi / 4 * np.sqrt(10e30))
-intvl = max_K // K #shorten the strategy space by checking intervals
-gamma = Decimal(0.60) # the probability that alice wins in a fork
+max_K = np.floor(np.pi / 4 * np.sqrt(D)) / 5
+intvl = max_K // K #shorten the strategy space by checking intervalss
+gamma = Decimal(0.50) # the probability that alice wins in a fork
 mat_dim = (K+1)**num_plays #dimension of payoff matrix
 
-getcontext().prec = 50
+getcontext().prec = 10
 
 # =====================
 
 original_stdout = sys.stdout
 
 #Calculates the probability of Grover's algorithm finding the marked item after time t.
+
+
 def p_i(t):
     theta = float(np.arcsin(1 / (np.sqrt(D))))
     return Decimal((np.sin(2*((t * intvl) + 0.5) * theta))**2)
@@ -55,13 +57,13 @@ def get_payoff(bob = False):
     #dimension of the payoff matrix
     dim = int(len(set_K)**num_plays)
     #initialize the payoff matrices. There will be a separate one for each play. A[0] will be the total
-    A = [np.zeros((dim, dim), dtype=Decimal) for i in range(num_plays + 1)]
+    A = [np.zeros((mat_dim, mat_dim), dtype=Decimal) for i in range(num_plays + 1)]
     
     #populate each array
     for play in range(1, num_plays + 1):
-        for col in range(dim):
-            for row in range(dim):
-                element = get_element(S, col, row, play, dim, bob)
+        for col in range(mat_dim):
+            for row in range(mat_dim):
+                element = get_element(S, col, row, play, mat_dim, bob)
                 A[play][col][row] = element
                 A[0][col][row] = A[0][col][row] + A[play][col][row]
 
@@ -116,7 +118,7 @@ def interval(arr1, arr2, p, play, prefactor, bob = False):
 
         for i in range(len(arr2) - 1):
             if sum(arr2[:i+1]) < x < sum(arr2[:i+2]):
-                return p_func(p, arr2[0:i+1]) + gamma/prefactor *  (p_i(x - arr2[i+1]))**2
+                return p_func(p, arr2[0:i+1]) + gamma/prefactor *  (p_i(x - sum(arr2[:i+1])))**2
             elif x == sum(arr2[:i+1]):
                 return p_func(p, arr2[0:i+2]) + gamma/prefactor * p_i(arr1[play-1]) * p_i(arr2[i])
 
@@ -130,7 +132,7 @@ def interval(arr1, arr2, p, play, prefactor, bob = False):
 
         for i in range(len(arr1) - 1):
             if sum(arr1[:i+1]) < x < sum(arr1[:i+2]):
-                return p_func(p, arr1[0:i+1]) + (1 - gamma)/prefactor *  (p_i(x - arr1[i+1]))**2
+                return p_func(p, arr1[0:i+1]) + (1 - gamma)/prefactor *  (p_i(x - sum(arr1[:i+1])))**2
             elif x == sum(arr1[:i+1]):
                 return p_func(p, arr1[0:i+2]) + (1 - gamma)/prefactor * p_i(arr2[play-1]) * p_i(arr1[i])
 
@@ -190,25 +192,35 @@ def print_results(res, player):
 
 
 
-def get_eq():
-    A = get_payoff()
-    B = get_payoff(bob = True)
-
-    with open('output.txt' , 'w') as f:
-        tableaus, basic_vars = lh.create_tableau(A, B)
-        Crange = basic_vars
+def get_eq(A, B):
+    tableaus, basic_vars = lh.create_tableau(A, B)
+    Crange = basic_vars
+    nash_eqs = []
+    with open('output.txt', 'w') as f:
         sys.stdout = f
 
         for i in range(mat_dim):
-            eq = lh.Lemke_Howson(tableaus, basic_vars, Crange, init_pivot = i)
-            print_results(np.round(eq[0], 10), 'Alice')
-            print_results(np.round(eq[1], 10), 'Bob')
-            print('-----')
+            eq = lh.Lemke_Howson(tableaus, basic_vars, Crange, init_pivot=i)
+
+            if len(nash_eqs) == 3:
+                break
+
+            if not (
+                any((np.allclose(eq[0], item[0]) and np.allclose(eq[1], item[1]) for item in nash_eqs))
+            ):
+                nash_eqs.append(eq)
+                print_results(np.round(eq[0], 20), 'Alice')
+                print_results(np.round(eq[1], 20), 'Bob')
+                print('-----')
 
     return 
 
 def main():
-    get_eq()
+    A = get_payoff()
+    B = get_payoff(bob = True)
+    print('payoff matrix made')
+    get_eq(A, B)
+    sys.stdout = original_stdout
 
 if __name__ == "__main__":
-    main()
+    main()  

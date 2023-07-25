@@ -106,16 +106,20 @@ def simulate_strats(fname):
 
 
 def plot_fork_rate():
-    Ds = [float(10**x) for x in range(30, 61, 5)]
+    original_D = tp.D
+    max_Ks = [np.floor(np.pi/4 * np.sqrt(original_D/x)) for x in range(1, 10)]
+    print(max_Ks)
     fork_rate = []
-    for i in range(len(Ds)):
-        tp.D = Ds[i]
-        tp.get_eq()
+    for i in range(len(max_Ks)):
+        print(max_Ks[i])
+        tp.main(max_K = max_Ks[i])
         fork_rate.append(simulate_strats(fname))
 
+    print(fork_rate)
+
     plt.figure()
-    plt.plot(Ds, fork_rate)
-    plt.xlabel('Difficulty')
+    plt.plot([1/x for x in range(1, 10)], fork_rate)
+    plt.xlabel('Maximum Fraction of Search Space')
     plt.ylabel('Fork Rate')
     plt.title('Forking Rate when Mining Optimally')
     plt.grid(True)
@@ -123,5 +127,5 @@ def plot_fork_rate():
     plt.savefig('result.png')
 
 
-plot_fork_rate()
-#print(simulate_strats(fname))
+#plot_fork_rate()
+print(simulate_strats(fname))
